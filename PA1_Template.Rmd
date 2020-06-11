@@ -1,0 +1,125 @@
+
+
+# Reproducible Research:  Assessment 1
+
+## 1- Code for reading in the dataset and/or processing the data
+Loading and preprocessing the data
+Show any code that is needed
+```{r loaddata}
+unzip(zipfile="repdata_data_activity.zip")
+data <- read.csv("activity.csv")
+```
+
+## 2- Histogram of the total number of steps taken each day
+What is mean total number of steps taken per day?
+For this part of the assignment, you can ignore the missing values in the dataset
+Calculate the total number of steps taken per day
+```{r}
+library(ggplot2)
+total.steps <- tapply(data$steps, data$date, sum, na.rm=TRUE)
+hist(total.steps, xlab="Total steps per day", ylab="Frequency using binwith 1000", main="Histogram for Total Steps",breaks = 20)
+```
+## 3- Mean and median number of steps taken each day
+Calculate and report the mean and median of the total number of steps taken per day
+```{r}
+mean(total.steps, na.rm=TRUE)
+median(total.steps, na.rm=TRUE)
+```
+
+## 4- Time series plot of the average number of steps taken
+What is the average daily activity pattern?
+Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+```{r}
+library(ggplot2)
+averages <- aggregate(x=list(steps=data$steps), by=list(interval=data$interval),
+                      FUN=mean, na.rm=TRUE)
+ggplot(data=averages, aes(x=interval, y=steps)) +
+    geom_line() +
+    xlab("5-minute interval") +
+    ylab("average number of steps taken") +
+ggtitle('Time series plot of number of steps taken')
+```
+
+## 5- The 5-minute interval that, on average, contains the maximum number of steps
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+averages[which.max(averages$steps),]
+```
+
+## 6- Code to describe and show a strategy for imputing missing data
+Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as \color{red}{\verb|NA|}NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
+
+1- Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with \color{red}{\verb|NA|}NAs)
+```{r how_many_missing}
+missing <- is.na(data$steps)
+# How many missing
+table(missing)
+```
+## 7- Histogram of the total number of steps taken each day after missing values are imputed
+All of the missing values are filled in with mean value for that 5-minute interval.
+
+2- Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
+
+```{r}
+# Replace each missing value with the mean value of its 5-minute interval
+fill.value <- function(steps, interval) {
+    filled <- NA
+    if (!is.na(steps))
+        filled <- c(steps)
+    else
+        filled <- (averages[averages$interval==interval, "steps"])
+    return(filled)
+}
+```
+
+3- Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+filled.data <- data
+filled.data$steps <- mapply(fill.value, filled.data$steps, filled.data$interval)
+head(filled.data)
+```
+
+4- Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+```{r}
+total.steps <- tapply(filled.data$steps, filled.data$date, FUN=sum)
+qplot(total.steps, xlab="Total steps per day (Imputed)", ylab="Frequency using binwith 1000", main="Histogram of the total number of steps taken each day", binwidth=1000)
+```
+## What is Mean and median total number of steps imputed taken per day?
+```{r}
+mean(total.steps)
+median(total.steps)
+```
+
+Mean and median values are higher after imputing missing data. The reason is that in the original data, there are some days with `steps` values `NA` for any `interval`. The total number of steps taken in such days are set to 0s by default. However, after replacing missing `steps` values with the mean `steps` of associated `interval` value, these 0 values are removed from the histogram of total number of steps taken each day.
+
+## 8- Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+Are there differences in activity patterns between weekdays and weekends?
+For this part the \color{red}{\verb|weekdays()|}weekdays() function may be of some help here. Use the dataset with the filled-in missing values for this part.
+```{r}
+weekday.or.weekend <- function(date) {
+    day <- weekdays(date)
+    if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"))
+        return("weekday")
+    else if (day %in% c("Saturday", "Sunday"))
+        return("weekend")
+    else
+        stop("invalid date")
+}
+filled.data$date <- as.Date(filled.data$date)
+filled.data$day <- sapply(filled.data$date, FUN=weekday.or.weekend)
+```
+
+A panel plot containing plots of average number of steps taken on weekdays and weekends.
+```{r}
+averages <- aggregate(steps ~ interval + day, data=filled.data, mean)
+library(ggplot2)
+ggplot(averages, aes(interval, steps)) + 
+    geom_line() + 
+    facet_grid(day ~ .) +
+    xlab("5-minute interval") + 
+    ylab("Average Number of steps") +
+ggtitle('Comparison of Average Number of Steps taken on weekdays and weekends')
+```
+    
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
